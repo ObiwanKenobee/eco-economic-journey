@@ -607,7 +607,7 @@ const BookingCalendar = () => (
           <div className="col-span-7 border-t-0 p-3 flex items-center justify-end space-x-4">
             <div className="flex items-center">
               <div className="w-3 h-3 bg-earth rounded-full mr-2"></div>
-              <span className="text-xs text-gray-600">High Occupancy (>75%)</span>
+              <span className="text-xs text-gray-600">High Occupancy (&gt;75%)</span>
             </div>
             <div className="flex items-center">
               <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
@@ -615,7 +615,7 @@ const BookingCalendar = () => (
             </div>
             <div className="flex items-center">
               <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-              <span className="text-xs text-gray-600">Low Occupancy (<50%)</span>
+              <span className="text-xs text-gray-600">Low Occupancy (&lt;50%)</span>
             </div>
           </div>
         </div>
