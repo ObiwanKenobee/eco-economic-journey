@@ -8,6 +8,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   className?: string;
   children: React.ReactNode;
   href?: string;
+  glow?: boolean;
 }
 
 const Button = ({ 
@@ -16,6 +17,7 @@ const Button = ({
   className,
   children,
   href,
+  glow = false,
   ...props 
 }: ButtonProps) => {
   const baseClasses = "relative inline-flex items-center justify-center font-medium transition-all duration-300 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-opacity-50 overflow-hidden group";
@@ -34,10 +36,13 @@ const Button = ({
     default: "bg-earth/90 text-white hover:bg-earth focus:ring-earth shadow-button hover:shadow-md hover:translate-y-[-2px]"
   };
 
+  const glowClasses = glow ? "after:absolute after:inset-0 after:bg-gradient-to-r after:from-savanna/20 after:to-forest/20 after:blur-xl after:scale-150 after:opacity-0 hover:after:opacity-100 after:transition-opacity after:duration-500 after:-z-10" : "";
+
   const classes = cn(
     baseClasses,
     sizeClasses[size],
     variantClasses[variant],
+    glowClasses,
     className
   );
   
