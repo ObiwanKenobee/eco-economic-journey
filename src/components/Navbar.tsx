@@ -3,10 +3,13 @@ import React, { useState, useEffect } from 'react';
 import { Menu, X } from 'lucide-react';
 import Button from './Button';
 import { cn } from '@/lib/utils';
+import { Link } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const { isAuthenticated, user } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -64,9 +67,20 @@ const Navbar = () => {
               </a>
             ))}
           </div>
-          <Button href="#join" size="sm">
-            Join the Movement
-          </Button>
+          {isAuthenticated ? (
+            <Button href="/dashboard" size="sm">
+              Dashboard
+            </Button>
+          ) : (
+            <div className="flex items-center space-x-2">
+              <Button href="/auth/login" variant="secondary" size="sm">
+                Sign In
+              </Button>
+              <Button href="/auth/register" size="sm">
+                Sign Up
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Mobile Menu Button */}
@@ -104,11 +118,26 @@ const Navbar = () => {
               {link.name}
             </a>
           ))}
-          <div className="pt-4">
-            <Button href="#join" className="w-full justify-center" onClick={() => setIsMenuOpen(false)}>
-              Join the Movement
-            </Button>
-          </div>
+          {isAuthenticated ? (
+            <Link to="/dashboard" className="block py-3" onClick={() => setIsMenuOpen(false)}>
+              <Button className="w-full justify-center">
+                Dashboard
+              </Button>
+            </Link>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 pt-3">
+              <Link to="/auth/login" onClick={() => setIsMenuOpen(false)}>
+                <Button variant="secondary" className="w-full justify-center">
+                  Sign In
+                </Button>
+              </Link>
+              <Link to="/auth/register" onClick={() => setIsMenuOpen(false)}>
+                <Button className="w-full justify-center">
+                  Sign Up
+                </Button>
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </nav>
