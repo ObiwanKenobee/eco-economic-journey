@@ -26,19 +26,11 @@ CREATE POLICY "Users can update their own profile"
 
 -- Create function to get user profile
 CREATE OR REPLACE FUNCTION public.get_user_profile(user_id UUID)
-RETURNS TABLE (
-  name TEXT,
-  role TEXT,
-  organization TEXT
-) LANGUAGE plpgsql SECURITY DEFINER AS $$
+RETURNS SETOF public.user_profiles
+LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
   RETURN QUERY
-  SELECT 
-    up.name,
-    up.role,
-    up.organization
-  FROM public.user_profiles up
-  WHERE up.id = user_id;
+  SELECT * FROM public.user_profiles WHERE id = user_id;
 END;
 $$;
 
@@ -49,9 +41,38 @@ CREATE OR REPLACE FUNCTION public.create_user_profile(
   user_role TEXT,
   user_organization TEXT
 )
-RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER AS $$
+RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
   INSERT INTO public.user_profiles (id, name, role, organization)
   VALUES (user_id, user_name, user_role, user_organization);
+END;
+$$;
+
+-- Function to update user profile
+CREATE OR REPLACE FUNCTION public.update_user_profile(
+  user_id UUID,
+  user_name TEXT,
+  user_role TEXT,
+  user_organization TEXT
+)
+RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  UPDATE public.user_profiles
+  SET name = user_name,
+      role = user_role,
+      organization = user_organization,
+      updated_at = now()
+  WHERE id = user_id;
+END;
+$$;
+
+-- Function to delete user profile
+CREATE OR REPLACE FUNCTION public.delete_user_profile(user_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  DELETE FROM public.user_profiles WHERE id = user_id;
 END;
 $$;

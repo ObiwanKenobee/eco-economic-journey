@@ -63,15 +63,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Fetch user profile from custom table
   const fetchUserProfile = async (userId: string): Promise<UserProfile | null> => {
     try {
-      // Use RPC call instead of direct table query
-      const { data, error } = await supabase.rpc('get_user_profile', { user_id: userId });
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('name, role, organization')
+        .eq('id', userId)
+        .single();
       
       if (error) {
         console.error('Error fetching user profile:', error);
         return null;
       }
       
-      return data;
+      return data as UserProfile;
     } catch (error) {
       console.error('Error in fetchUserProfile:', error);
       return null;
@@ -182,13 +185,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
       
       if (data.user) {
-        // Store additional user metadata using RPC function
-        const { error: profileError } = await supabase.rpc('create_user_profile', {
-          user_id: data.user.id,
-          user_name: name,
-          user_role: role,
-          user_organization: organization || null
-        });
+        // Store additional user metadata
+        const { error: profileError } = await supabase
+          .from('user_profiles')
+          .insert([
+            { 
+              id: data.user.id, 
+              name, 
+              role,
+              organization: organization || null
+            }
+          ]);
         
         if (profileError) {
           console.error('Error creating user profile:', profileError);
