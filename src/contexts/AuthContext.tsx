@@ -1,6 +1,9 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { User as SupabaseUser, Session } from "@supabase/supabase-js";
+import { trackEvent } from '@/utils/analytics';
 
 export type UserRole = 'tourist' | 'business' | 'financial' | 'it' | 'regulatory' | 'admin';
 
@@ -37,87 +40,110 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  // Transform Supabase user to our User type
+  const transformUser = (supabaseUser: SupabaseUser | null, userData?: { role: UserRole, name: string, organization?: string }) => {
+    if (!supabaseUser) return null;
+    
+    return {
+      id: supabaseUser.id,
+      email: supabaseUser.email || '',
+      name: userData?.name || supabaseUser.email?.split('@')[0] || 'User',
+      role: userData?.role || 'tourist',
+      organization: userData?.organization,
+      avatarUrl: '/placeholder.svg'
+    };
+  };
+
   // Check for existing session on initial load
   useEffect(() => {
-    const storedUser = localStorage.getItem('guardian_user');
-    if (storedUser) {
+    const initializeAuth = async () => {
+      setLoading(true);
+      
       try {
-        setUser(JSON.parse(storedUser));
+        // Check if we have an active session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          throw sessionError;
+        }
+        
+        if (session) {
+          // Get user metadata from our custom table if available
+          const { data: userData, error: userDataError } = await supabase
+            .from('user_profiles')
+            .select('name, role, organization')
+            .eq('id', session.user.id)
+            .single();
+          
+          if (userDataError && userDataError.code !== 'PGRST116') {
+            console.error('Error fetching user data:', userDataError);
+          }
+          
+          setUser(transformUser(session.user, userData || undefined));
+        }
       } catch (error) {
-        console.error('Failed to parse stored user:', error);
-        localStorage.removeItem('guardian_user');
+        console.error('Auth initialization error:', error);
+        toast({
+          title: "Authentication Error",
+          description: "There was a problem with the authentication system.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
       }
-    }
-    setLoading(false);
-  }, []);
+    };
+    
+    initializeAuth();
+    
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+          // Get user metadata from our custom table
+          const { data: userData, error: userDataError } = await supabase
+            .from('user_profiles')
+            .select('name, role, organization')
+            .eq('id', session.user.id)
+            .single();
+          
+          if (userDataError && userDataError.code !== 'PGRST116') {
+            console.error('Error fetching user data:', userDataError);
+          }
+          
+          setUser(transformUser(session.user, userData || undefined));
+          
+          // Track sign in event
+          trackEvent('user_signed_in');
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
+          // Track sign out event
+          trackEvent('user_signed_out');
+        }
+      }
+    );
+    
+    // Clean up subscription
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [toast]);
 
-  // Mock login function - in a real app, this would connect to your backend
   const login = async (email: string, password: string) => {
     setLoading(true);
     
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
       
-      // Simple mock validation
-      if (email === 'admin@guardian-io.com' && password === 'password') {
-        const mockUser: User = {
-          id: '1',
-          name: 'Guardian Admin',
-          email: 'admin@guardian-io.com',
-          role: 'admin',
-          organization: 'Guardian-IO',
-          avatarUrl: '/placeholder.svg'
-        };
-        
-        setUser(mockUser);
-        localStorage.setItem('guardian_user', JSON.stringify(mockUser));
-        toast({
-          title: "Login successful",
-          description: `Welcome back, ${mockUser.name}!`,
-        });
-        return;
-      }
+      if (error) throw error;
       
-      // More mock users for demonstration
-      if (email === 'tourist@example.com' && password === 'password') {
-        const mockUser: User = {
-          id: '2',
-          name: 'Eco Traveler',
-          email: 'tourist@example.com',
-          role: 'tourist',
-          avatarUrl: '/placeholder.svg'
-        };
-        
-        setUser(mockUser);
-        localStorage.setItem('guardian_user', JSON.stringify(mockUser));
-        toast({
-          title: "Login successful",
-          description: `Welcome back, ${mockUser.name}!`,
-        });
-        return;
-      }
-      
-      if (email === 'business@example.com' && password === 'password') {
-        const mockUser: User = {
-          id: '3',
-          name: 'Hotel Manager',
-          email: 'business@example.com',
-          role: 'business',
-          organization: 'Eco Resort & Spa',
-          avatarUrl: '/placeholder.svg'
-        };
-        
-        setUser(mockUser);
-        localStorage.setItem('guardian_user', JSON.stringify(mockUser));
-        toast({
-          title: "Login successful",
-          description: `Welcome back, ${mockUser.name}!`,
-        });
-        return;
-      }
-      
-      throw new Error('Invalid credentials');
+      // User data is handled by the auth state change listener
+      toast({
+        title: "Login successful",
+        description: `Welcome back!`,
+      });
     } catch (error) {
       toast({
         title: "Login failed",
@@ -130,40 +156,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Mock register function
   const register = async (name: string, email: string, password: string, role: UserRole, organization?: string) => {
     setLoading(true);
     
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Simple validation
-      if (!email.includes('@')) {
-        throw new Error('Invalid email address');
-      }
-      
-      if (password.length < 6) {
-        throw new Error('Password must be at least 6 characters long');
-      }
-      
-      // Create new user
-      const newUser: User = {
-        id: Math.random().toString(36).substr(2, 9),
-        name,
+      // Sign up the user
+      const { data, error } = await supabase.auth.signUp({
         email,
-        role,
-        organization,
-        avatarUrl: '/placeholder.svg'
-      };
-      
-      setUser(newUser);
-      localStorage.setItem('guardian_user', JSON.stringify(newUser));
-      
-      toast({
-        title: "Registration successful",
-        description: `Welcome to Guardian-IO, ${name}!`,
+        password,
+        options: {
+          data: {
+            name,
+            role,
+            organization
+          }
+        }
       });
+      
+      if (error) throw error;
+      
+      if (data.user) {
+        // Store additional user metadata in our table
+        const { error: profileError } = await supabase
+          .from('user_profiles')
+          .insert({
+            id: data.user.id,
+            name,
+            role,
+            organization
+          });
+        
+        if (profileError) {
+          console.error('Error creating user profile:', profileError);
+          toast({
+            title: "Warning",
+            description: "Account created but profile data could not be saved.",
+            variant: "destructive",
+          });
+        }
+        
+        // Transform and set user data
+        setUser(transformUser(data.user, { name, role, organization }));
+        
+        toast({
+          title: "Registration successful",
+          description: `Welcome to Guardian-IO, ${name}!`,
+        });
+        
+        // Track sign up event
+        trackEvent('user_signed_up', { role });
+      }
     } catch (error) {
       toast({
         title: "Registration failed",
@@ -176,13 +218,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('guardian_user');
-    toast({
-      title: "Logout successful",
-      description: "You have been logged out successfully.",
-    });
+  const logout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) throw error;
+      
+      // User is set to null in the auth state change listener
+      toast({
+        title: "Logout successful",
+        description: "You have been logged out successfully.",
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast({
+        title: "Logout failed",
+        description: error instanceof Error ? error.message : "An error occurred during logout",
+        variant: "destructive",
+      });
+    }
   };
 
   return (

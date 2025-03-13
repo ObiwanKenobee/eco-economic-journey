@@ -2,37 +2,75 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import Button from '@/components/Button';
 import { Building, Eye, EyeOff, Lock, Mail, User } from 'lucide-react';
 import { UserRole } from '@/contexts/AuthContext';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Button } from '@/components/ui/button';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+// Validation schema
+const formSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  email: z.string().email('Please enter a valid email'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+  role: z.enum(['tourist', 'business', 'financial', 'it', 'regulatory', 'admin']),
+  organization: z.string().optional(),
+});
+
+type FormData = z.infer<typeof formSchema>;
 
 const Register = () => {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [role, setRole] = useState<UserRole>('tourist');
-  const [organization, setOrganization] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    
+  // Initialize form
+  const form = useForm<FormData>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      password: '',
+      role: 'tourist',
+      organization: '',
+    },
+  });
+
+  const watchRole = form.watch('role');
+  const showOrganizationField = watchRole !== 'tourist';
+
+  const onSubmit = async (data: FormData) => {
     try {
-      await register(name, email, password, role, organization);
+      await register(
+        data.name, 
+        data.email, 
+        data.password, 
+        data.role as UserRole, 
+        data.organization
+      );
       navigate('/dashboard');
     } catch (error) {
       console.error('Registration error:', error);
       // Error is handled in the AuthContext
-    } finally {
-      setIsSubmitting(false);
     }
   };
-
-  const showOrganizationField = role !== 'tourist';
 
   return (
     <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100">
@@ -41,139 +79,160 @@ const Register = () => {
         <p className="text-gray-600">Join the Eco-Economy movement</p>
       </div>
       
-      <form onSubmit={handleSubmit} className="space-y-5">
-        <div>
-          <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-            Full Name
-          </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <User className="h-5 w-5 text-gray-400" />
-            </div>
-            <input
-              id="name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-earth/50 focus:border-earth transition-all"
-              placeholder="Your full name"
-              required
-            />
-          </div>
-        </div>
-        
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-            Email
-          </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Mail className="h-5 w-5 text-gray-400" />
-            </div>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-earth/50 focus:border-earth transition-all"
-              placeholder="your@email.com"
-              required
-            />
-          </div>
-        </div>
-        
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-            Password
-          </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Lock className="h-5 w-5 text-gray-400" />
-            </div>
-            <input
-              id="password"
-              type={showPassword ? "text" : "password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full pl-10 pr-10 py-3 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-earth/50 focus:border-earth transition-all"
-              placeholder="••••••••"
-              required
-              minLength={6}
-            />
-            <button
-              type="button"
-              className="absolute inset-y-0 right-0 pr-3 flex items-center"
-              onClick={() => setShowPassword(!showPassword)}
-            >
-              {showPassword ? (
-                <EyeOff className="h-5 w-5 text-gray-400" />
-              ) : (
-                <Eye className="h-5 w-5 text-gray-400" />
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Full Name</FormLabel>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <User className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      placeholder="Your full name"
+                      className="pl-10 py-3"
+                    />
+                  </FormControl>
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Mail className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      placeholder="your@email.com"
+                      className="pl-10 py-3"
+                    />
+                  </FormControl>
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Password</FormLabel>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Lock className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      className="pl-10 pr-10 py-3"
+                    />
+                  </FormControl>
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5 text-gray-400" />
+                    ) : (
+                      <Eye className="h-5 w-5 text-gray-400" />
+                    )}
+                  </button>
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          <FormField
+            control={form.control}
+            name="role"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>I am joining as a</FormLabel>
+                <Select
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select your role" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="tourist">Eco-Traveler</SelectItem>
+                    <SelectItem value="business">Hospitality & Travel Business</SelectItem>
+                    <SelectItem value="financial">Bank & Financial Institution</SelectItem>
+                    <SelectItem value="it">Telecom & Tech Provider</SelectItem>
+                    <SelectItem value="regulatory">Government & Policy Maker</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          {showOrganizationField && (
+            <FormField
+              control={form.control}
+              name="organization"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Organization Name</FormLabel>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Building className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="Your organization name"
+                        className="pl-10 py-3"
+                      />
+                    </FormControl>
+                  </div>
+                  <FormMessage />
+                </FormItem>
               )}
-            </button>
-          </div>
-        </div>
-        
-        <div>
-          <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">
-            I am joining as a
-          </label>
-          <select
-            id="role"
-            value={role}
-            onChange={(e) => setRole(e.target.value as UserRole)}
-            className="w-full px-4 py-3 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-earth/50 focus:border-earth transition-all appearance-none"
-            required
-          >
-            <option value="tourist">Eco-Traveler</option>
-            <option value="business">Hospitality & Travel Business</option>
-            <option value="financial">Bank & Financial Institution</option>
-            <option value="it">Telecom & Tech Provider</option>
-            <option value="regulatory">Government & Policy Maker</option>
-          </select>
-        </div>
-        
-        {showOrganizationField && (
-          <div>
-            <label htmlFor="organization" className="block text-sm font-medium text-gray-700 mb-1">
-              Organization Name
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Building className="h-5 w-5 text-gray-400" />
-              </div>
-              <input
-                id="organization"
-                type="text"
-                value={organization}
-                onChange={(e) => setOrganization(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-earth/50 focus:border-earth transition-all"
-                placeholder="Your organization name"
-                required={showOrganizationField}
-              />
-            </div>
-          </div>
-        )}
-        
-        <div>
+            />
+          )}
+          
           <Button
             type="submit"
             className="w-full justify-center py-3 mt-2"
-            disabled={isSubmitting}
+            disabled={form.formState.isSubmitting}
           >
-            {isSubmitting ? 'Creating account...' : 'Create Account'}
+            {form.formState.isSubmitting ? 'Creating account...' : 'Create Account'}
           </Button>
-        </div>
-        
-        <div className="text-center mt-6">
-          <p className="text-sm text-gray-600">
-            Already have an account?{' '}
-            <Link to="/auth/login" className="text-earth hover:text-earth/80 font-medium transition-colors">
-              Sign in
-            </Link>
-          </p>
-        </div>
-      </form>
+          
+          <div className="text-center mt-6">
+            <p className="text-sm text-gray-600">
+              Already have an account?{' '}
+              <Link to="/auth/login" className="text-earth hover:text-earth/80 font-medium transition-colors">
+                Sign in
+              </Link>
+            </p>
+          </div>
+        </form>
+      </Form>
     </div>
   );
 };
