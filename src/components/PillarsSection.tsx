@@ -1,8 +1,10 @@
 
 import React from 'react';
-import { Leaf, CreditCard, Radio, Globe, Users, ShieldCheck } from 'lucide-react';
+import { Leaf, CreditCard, Radio, Globe, Users, ShieldCheck, Lock } from 'lucide-react';
 import Button from './Button';
 import AnimatedSection from './AnimatedSection';
+import { useAuth } from '@/contexts/AuthContext';
+import { Link } from 'react-router-dom';
 
 interface PillarCardProps {
   title: string;
@@ -28,6 +30,8 @@ const PillarCard = ({ title, description, icon, delay, color }: PillarCardProps)
 );
 
 const PillarsSection = () => {
+  const { isAuthenticated } = useAuth();
+
   return (
     <section id="how-it-works" className="py-20 lg:py-32 bg-gray-50 relative overflow-hidden">
       {/* Background pattern */}
@@ -43,9 +47,16 @@ const PillarsSection = () => {
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-charcoal mb-6">
             A <span className="text-forest">Regenerative Economy</span> That Heals Our Planet
           </h2>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Our integrated ecosystem transforms tourism into a powerful engine for conservation, community prosperity, and ecological restoration across Africa and beyond.
-          </p>
+          
+          {isAuthenticated ? (
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Our integrated ecosystem transforms tourism into a powerful engine for conservation, community prosperity, and ecological restoration across Africa and beyond.
+            </p>
+          ) : (
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Our integrated ecosystem transforms tourism into a powerful force for planetary healing and community prosperity. <span className="text-earth font-medium">Sign in to see our impact metrics.</span>
+            </p>
+          )}
         </AnimatedSection>
         
         <div className="grid md:grid-cols-3 gap-6 lg:gap-10 mt-12">
@@ -96,11 +107,33 @@ const PillarsSection = () => {
           />
         </div>
         
-        <AnimatedSection animation="fade-up" delay={1400} className="text-center mt-16">
-          <Button href="#impact" glow>
-            See Our Impact
-          </Button>
-        </AnimatedSection>
+        {!isAuthenticated ? (
+          <AnimatedSection animation="fade-up" delay={1400} className="text-center mt-16 p-8 bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-100 shadow-lg max-w-2xl mx-auto">
+            <div className="flex items-center justify-center mb-6">
+              <div className="w-16 h-16 flex items-center justify-center bg-earth/10 rounded-full text-earth">
+                <Lock className="w-8 h-8" />
+              </div>
+            </div>
+            <h3 className="text-2xl font-bold text-charcoal mb-4">Impact Metrics Protected</h3>
+            <p className="text-gray-600 mb-6">
+              Our detailed impact metrics, including data on Morocco's $11B+ tourism revenue transformation and our $100B regeneration engine, are available to registered members only.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Button href="/auth/login" variant="secondary">
+                Sign In
+              </Button>
+              <Button href="/auth/register" glow>
+                Join the Movement
+              </Button>
+            </div>
+          </AnimatedSection>
+        ) : (
+          <AnimatedSection animation="fade-up" delay={1400} className="text-center mt-16">
+            <Button href="#impact" glow>
+              See Our Impact
+            </Button>
+          </AnimatedSection>
+        )}
       </div>
     </section>
   );
