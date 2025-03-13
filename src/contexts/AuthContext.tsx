@@ -16,6 +16,12 @@ export interface User {
   avatarUrl?: string;
 }
 
+interface UserProfile {
+  name: string;
+  role: UserRole;
+  organization?: string;
+}
+
 interface AuthContextType {
   user: User | null;
   loading: boolean;
@@ -41,7 +47,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { toast } = useToast();
 
   // Transform Supabase user to our User type
-  const transformUser = (supabaseUser: SupabaseUser | null, userData?: { role: UserRole, name: string, organization?: string }) => {
+  const transformUser = (supabaseUser: SupabaseUser | null, userData?: UserProfile) => {
     if (!supabaseUser) return null;
     
     return {
@@ -52,6 +58,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       organization: userData?.organization,
       avatarUrl: '/placeholder.svg'
     };
+  };
+
+  // Fetch user profile from custom table
+  const fetchUserProfile = async (userId: string): Promise<UserProfile | null> => {
+    try {
+      // Use RPC call instead of direct table query
+      const { data, error } = await supabase.rpc('get_user_profile', { user_id: userId });
+      
+      if (error) {
+        console.error('Error fetching user profile:', error);
+        return null;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Error in fetchUserProfile:', error);
+      return null;
+    }
   };
 
   // Check for existing session on initial load
@@ -68,17 +92,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         
         if (session) {
-          // Get user metadata from our custom table if available
-          const { data: userData, error: userDataError } = await supabase
-            .from('user_profiles')
-            .select('name, role, organization')
-            .eq('id', session.user.id)
-            .single();
-          
-          if (userDataError && userDataError.code !== 'PGRST116') {
-            console.error('Error fetching user data:', userDataError);
-          }
-          
+          // Get user metadata using our helper function
+          const userData = await fetchUserProfile(session.user.id);
           setUser(transformUser(session.user, userData || undefined));
         }
       } catch (error) {
@@ -99,17 +114,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (event === 'SIGNED_IN' && session) {
-          // Get user metadata from our custom table
-          const { data: userData, error: userDataError } = await supabase
-            .from('user_profiles')
-            .select('name, role, organization')
-            .eq('id', session.user.id)
-            .single();
-          
-          if (userDataError && userDataError.code !== 'PGRST116') {
-            console.error('Error fetching user data:', userDataError);
-          }
-          
+          // Get user metadata
+          const userData = await fetchUserProfile(session.user.id);
           setUser(transformUser(session.user, userData || undefined));
           
           // Track sign in event
@@ -176,15 +182,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
       
       if (data.user) {
-        // Store additional user metadata in our table
-        const { error: profileError } = await supabase
-          .from('user_profiles')
-          .insert({
-            id: data.user.id,
-            name,
-            role,
-            organization
-          });
+        // Store additional user metadata using RPC function
+        const { error: profileError } = await supabase.rpc('create_user_profile', {
+          user_id: data.user.id,
+          user_name: name,
+          user_role: role,
+          user_organization: organization || null
+        });
         
         if (profileError) {
           console.error('Error creating user profile:', profileError);
